@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance — HRMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        .checkin-card {
+            background: linear-gradient(135deg, var(--regal-navy) 0%, #1a2d5a 100%);
+            border-radius:16px; padding:2rem; color:#fff; margin-bottom:1.5rem;
+            display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+        }
+        .checkin-info h2  { font-size:1.1rem; font-weight:700; margin-bottom:.25rem; }
+        .checkin-info p   { font-size:.85rem; opacity:.75; }
+        .checkin-time     { font-size:2rem; font-weight:700; letter-spacing:1px; }
+        .checkin-date     { font-size:.8rem; opacity:.7; margin-bottom:.5rem; }
+        .checkin-status   { display:flex; align-items:center; gap:.5rem; font-size:.85rem; margin-top:.5rem; }
+        .status-dot       { width:8px; height:8px; border-radius:50%; }
+        .dot-in   { background:#6abea7; }
+        .dot-out  { background:#bc7c9c; }
+        .dot-none { background:rgba(255,255,255,.3); }
+        .checkin-actions  { display:flex; gap:.75rem; flex-wrap:wrap; }
+        .btn-checkin {
+            padding:.7rem 1.4rem; border-radius:10px; font-size:.9rem; font-weight:700;
+            cursor:pointer; border:none; display:flex; align-items:center; gap:.5rem;
+            transition:opacity .2s, transform .1s; font-family:'DM Sans',sans-serif;
+        }
+        .btn-checkin:hover:not(:disabled) { opacity:.9; transform:translateY(-1px); }
+        .btn-checkin:disabled { opacity:.4; cursor:not-allowed; }
+        .btn-in  { background:#6abea7; color:#fff; }
+        .btn-out { background:#bc7c9c; color:#fff; }
+        .no-link-notice {
+            background:rgba(255,255,255,.08); border-radius:10px; padding:1rem 1.25rem;
+            font-size:.85rem; opacity:.85;
+        }
+    </style>
+</head>
+<body>
+
+<main class="main-wrap">
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <div class="page-title">Attendance</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topbar-date"></span>
+        </div>
+    </header>
+    <div class="content-area">
+        <div id="alert-area"></div>
+
+        <!-- ── EMPLOYEE: Self check-in card ── -->
+        <div id="checkin-card" class="checkin-card" style="display:none">
+            <div class="checkin-info">
+                <div class="checkin-date" id="ci-date"></div>
+                <h2>Today's Attendance</h2>
+                <div class="checkin-status" id="ci-status">
+                    <span class="status-dot dot-none"></span> Not checked in yet
+                </div>
+                <div style="margin-top:.75rem;font-size:.8rem;opacity:.7" id="ci-times"></div>
+            </div>
+            <div style="text-align:right">
+                <div class="checkin-time" id="ci-clock">--:--</div>
+                <div class="checkin-actions" style="margin-top:.75rem">
+                    <button class="btn-checkin btn-in"  id="btn-checkin"  onclick="doCheckIn()">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Check In
+                    </button>
+                    <button class="btn-checkin btn-out" id="btn-checkout" onclick="doCheckOut()" disabled>
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i> Check Out
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- No emp profile notice -->
+        <div id="no-link-card" style="display:none" class="checkin-card">
+            <div class="no-link-notice">
+                <i class="fa-solid fa-circle-info"></i>
+                Your account is not yet linked to an employee profile.
+                Contact your admin to link your account so you can use check-in features.
+            </div>
+        </div>
+
+        <!-- KPI Row -->
+        <div class="kpi-row" style="margin-bottom:1.5rem">
+            <div class="kpi-card kpi-teal">
+                <div class="kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="kpi-value" id="kpi-present">—</div>
+                <div class="kpi-label">Present This Month</div>
+            </div>
+            <div class="kpi-card kpi-rose">
+                <div class="kpi-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+                <div class="kpi-value" id="kpi-absent">—</div>
+                <div class="kpi-label">Absent This Month</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-icon"><i class="fa-solid fa-clock"></i></div>
+                <div class="kpi-value" id="kpi-late">—</div>
+                <div class="kpi-label">Late This Month</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="filter-bar">
+                <input type="month" id="month-input" class="filter-input">
+                <select id="emp-select" class="filter-select admin-only" style="display:none">
+                    <option value="">All Employees</option>
+                </select>
+                <button onclick="loadAttendance()" class="btn-sm btn-primary">Filter</button>
+                <button onclick="clearFilters()" class="btn-sm btn-ghost">Clear</button>
+            </div>
+            <a href="/attendance/mark" class="btn-primary admin-only" style="display:none">+ Mark Attendance</a>
+        </div>
+
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th><th>Date</th><th>Status</th>
+                        <th>Check In</th><th>Check Out</th><th>Overtime (hrs)</th>
+                    </tr>
+                </thead>
+                <tbody id="attendance-body">
+                    <tr><td colspan="6" class="loading-row">Loading…</td></tr>
+                </tbody>
+            </table>
+            <div class="table-footer" id="table-footer"></div>
+        </div>
+    </div>
+</main>
+
+<script src="/static/base.js"></script>
+<script src="/static/sidebar.js"></script>
+<script>
+let pageUser    = null;
+let clockTimer  = null;
+
+(async () => {
+    pageUser = await initPage('attendance');
+    if (!pageUser) return;
+
+    const now = new Date();
+    document.getElementById('month-input').value =
+        `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+    if (pageUser.role === 'EMPLOYEE') {
+        // Show check-in card, set up clock
+        startClock();
+        await loadTodayStatus();
+    } else {
+        // Admin: show filters and mark button
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+    }
+
+    await loadAttendance();
+})();
+
+// ── Live clock ─────────────────────────────────────────────
+function startClock() {
+    function tick() {
+        const now = new Date();
+        document.getElementById('ci-clock').textContent =
+            now.toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit',hour12:false});
+        document.getElementById('ci-date').textContent =
+            now.toLocaleDateString('en-PK',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    }
+    tick();
+    clockTimer = setInterval(tick, 1000);
+}
+
+// ── Load today's check-in status ────────────────────────────
+async function loadTodayStatus() {
+   try {
+        const res  = await fetch('/api/attendance/today');
+        const data = await res.json();
+
+        if (!data.emp_linked) {
+            // ── REPLACE: don't show scary card, just hide check-in silently ──
+            document.getElementById('checkin-card').style.display = 'none';
+            document.getElementById('no-link-card').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('checkin-card').style.display = 'flex';
+        const statusEl = document.getElementById('ci-status');
+        const timesEl  = document.getElementById('ci-times');
+        const btnIn    = document.getElementById('btn-checkin');
+        const btnOut   = document.getElementById('btn-checkout');
+
+        if (data.checked_out) {
+            statusEl.innerHTML = `<span class="status-dot dot-out"></span> Checked out`;
+            timesEl.innerHTML  = `In: ${data.check_in} &nbsp;|&nbsp; Out: ${data.check_out} &nbsp;|&nbsp; OT: ${data.overtime}h`;
+            btnIn.disabled  = true;
+            btnOut.disabled = true;
+        } else if (data.checked_in) {
+            statusEl.innerHTML = `<span class="status-dot dot-in"></span> Checked in at ${data.check_in}`;
+            timesEl.innerHTML  = `Checked in · clock is running`;
+            btnIn.disabled  = true;
+            btnOut.disabled = false;
+        } else {
+            statusEl.innerHTML = `<span class="status-dot dot-none"></span> Not checked in yet`;
+            timesEl.innerHTML  = '';
+            btnIn.disabled  = false;
+            btnOut.disabled = true;
+        }
+    } catch (e) {
+        document.getElementById('no-link-card').style.display = 'flex';
+    }
+}
+
+// ── Check-in ────────────────────────────────────────────────
+async function doCheckIn() {
+    const btn = document.getElementById('btn-checkin');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+        const res  = await fetch('/api/attendance/checkin', {method:'POST'});
+        const data = await res.json();
+        if (data.success) {
+            showAlert(data.message, 'success');
+            await loadTodayStatus();
+            await loadAttendance();
+        } else {
+            showAlert(data.message || 'Check-in failed.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Check In';
+        }
+    } catch {
+        showAlert('Network error.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Check In';
+    }
+}
+
+// ── Check-out ───────────────────────────────────────────────
+async function doCheckOut() {
+    const btn = document.getElementById('btn-checkout');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+        const res  = await fetch('/api/attendance/checkout', {method:'POST'});
+        const data = await res.json();
+        if (data.success) {
+            showAlert(data.message, 'success');
+            await loadTodayStatus();
+            await loadAttendance();
+        } else {
+            showAlert(data.message || 'Check-out failed.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right-from-bracket"></i> Check Out';
+        }
+    } catch {
+        showAlert('Network error.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-arrow-right-from-bracket"></i> Check Out';
+    }
+}
+
+// ── Load attendance table ───────────────────────────────────
+async function loadAttendance() {
+    const month = document.getElementById('month-input').value;
+    const empId = document.getElementById('emp-select').value;
+    const params = new URLSearchParams();
+    if (month) params.set('month', month);
+    if (empId) params.set('emp_id', empId);
+
+    try {
+        const res  = await fetch('/api/attendance?' + params);
+        const data = await res.json();
+        if (data.error) { showAlert(data.error); return; }
+
+        const sc = data.status_counts || {};
+        document.getElementById('kpi-present').textContent = sc.PRESENT  || 0;
+        document.getElementById('kpi-absent').textContent  = sc.ABSENT   || 0;
+        document.getElementById('kpi-late').textContent    = sc.LATE     || 0;
+
+        if (pageUser && ['ADMIN','HR'].includes(pageUser.role)) {
+            const empSel = document.getElementById('emp-select');
+            if (empSel.options.length <= 1 && data.employees) {
+                data.employees.forEach(e => empSel.add(new Option(e.name, e.id)));
+                if (empId) empSel.value = empId;
+            }
+        }
+
+        const tbody = document.getElementById('attendance-body');
+        if (!data.records || !data.records.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No records found.</td></tr>';
+        } else {
+            tbody.innerHTML = data.records.map(r => `
+                <tr>
+                    <td><strong>${r.emp_name}</strong></td>
+                    <td>${r.date}</td>
+                    <td>${statusBadge(r.status)}</td>
+                    <td class="mono">${r.check_in}</td>
+                    <td class="mono">${r.check_out}</td>
+                    <td>${r.overtime}</td>
+                </tr>`).join('');
+        }
+        document.getElementById('table-footer').textContent = `${(data.records||[]).length} record(s)`;
+    } catch { showAlert('Failed to load attendance.'); }
+}
+
+function clearFilters() {
+    const now = new Date();
+    document.getElementById('month-input').value =
+        `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('emp-select').value = '';
+    loadAttendance();
+}
+</script>
+</body>
+</html>

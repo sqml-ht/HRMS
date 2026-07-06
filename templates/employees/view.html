@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Profile — HRMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<main class="main-wrap">
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <div class="page-title">Employee Profile</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topbar-date"></span>
+        </div>
+    </header>
+    <div class="content-area">
+        <div id="alert-area"></div>
+        <div id="profile-content">
+            <div style="padding:2rem;color:var(--text-muted)">Loading profile…</div>
+        </div>
+    </div>
+</main>
+
+<script src="/static/base.js"></script>
+<script src="/static/sidebar.js"></script>
+<script>
+const pathParts = window.location.pathname.split('/');
+const empId     = pathParts[pathParts.length - 1];
+
+(async () => {
+    const user = await initPage('employees');
+    if (!user) return;
+
+    try {
+        const res  = await fetch(`/api/employees/${empId}`);
+        const data = await res.json();
+        if (data.error) { showAlert(data.error); return; }
+
+        const e       = data.employee;
+        const isAdmin = ['ADMIN','HR'].includes(user.role);
+        const initials = (e.first_name[0] || '') + (e.last_name[0] || '');
+
+        document.getElementById('profile-content').innerHTML = `
+            <div class="profile-grid">
+                <!-- Profile Header -->
+                <div class="card profile-header">
+                    <div class="profile-avatar">${initials}</div>
+                    <div class="profile-info">
+                        <h2>${e.first_name} ${e.last_name}</h2>
+                        <p>${e.designation} &nbsp;|&nbsp; ${e.dept_name}</p>
+                        <p class="mono">${e.email}</p>
+                    </div>
+                    <div class="profile-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Department</span>
+                            <span class="badge badge-blue">${e.dept_name || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Grade</span>
+                            <span class="badge badge-rose">${e.grade || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Salary</span>
+                            <strong>PKR ${fmtNum(e.salary)}</strong>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Hire Date</span>
+                            <span>${e.hire_date || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Manager</span>
+                            <span>${e.manager || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Status</span>
+                            ${statusBadge(e.status)}
+                        </div>
+                    </div>
+                    ${isAdmin ? `
+                    <div style="margin-top:1rem">
+                        <a href="/employees/edit/${e.emp_id}" class="btn-primary">Edit Profile</a>
+                    </div>` : ''}
+                </div>
+
+                <!-- Attendance History -->
+                <div class="card">
+                    <div class="card-header"><h3>Recent Attendance</h3></div>
+                    <table class="data-table">
+                        <thead><tr><th>Date</th><th>Status</th><th>Check In</th><th>Check Out</th><th>OT (hrs)</th></tr></thead>
+                        <tbody>
+                            ${data.attendance && data.attendance.length
+                                ? data.attendance.map(a => `
+                                    <tr>
+                                        <td>${a.date}</td>
+                                        <td>${statusBadge(a.status)}</td>
+                                        <td class="mono">${a.check_in}</td>
+                                        <td class="mono">${a.check_out}</td>
+                                        <td>${a.overtime}</td>
+                                    </tr>`).join('')
+                                : '<tr><td colspan="5" class="empty-row">No attendance records.</td></tr>'
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Payroll History -->
+                <div class="card">
+                    <div class="card-header"><h3>Payroll History</h3></div>
+                    <table class="data-table">
+                        <thead><tr><th>Period</th><th>Basic</th><th>Bonus</th><th>Deductions</th><th>Tax</th><th>Net Pay</th><th>Status</th></tr></thead>
+                        <tbody>
+                            ${data.payroll && data.payroll.length
+                                ? data.payroll.map(p => `
+                                    <tr>
+                                        <td>${p.month} ${p.year}</td>
+                                        <td>${fmtNum(p.basic)}</td>
+                                        <td>${fmtNum(p.bonus)}</td>
+                                        <td>${fmtNum(p.deductions)}</td>
+                                        <td>${fmtNum(p.tax)}</td>
+                                        <td><strong>${fmtNum(p.net)}</strong></td>
+                                        <td>${statusBadge(p.status)}</td>
+                                    </tr>`).join('')
+                                : '<tr><td colspan="7" class="empty-row">No payroll records.</td></tr>'
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Salary History -->
+                ${data.salary_history && data.salary_history.length ? `
+                <div class="card">
+                    <div class="card-header"><h3>Salary History</h3></div>
+                    <table class="data-table">
+                        <thead><tr><th>Old Salary</th><th>New Salary</th><th>Change</th><th>Date</th><th>Changed By</th></tr></thead>
+                        <tbody>
+                            ${data.salary_history.map(h => {
+                                const diff = (h.new || 0) - (h.old || 0);
+                                return `<tr>
+                                    <td>${fmtNum(h.old)}</td>
+                                    <td>${fmtNum(h.new)}</td>
+                                    <td class="${diff >= 0 ? 'text-green' : 'text-red'}">${diff >= 0 ? '+' : ''}${fmtNum(diff)}</td>
+                                    <td>${h.date}</td>
+                                    <td class="mono">${h.by}</td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>` : ''}
+            </div>`;
+
+    } catch (e) {
+        showAlert('Failed to load employee profile.');
+    }
+})();
+</script>
+</body>
+</html>

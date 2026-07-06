@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard / HRMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        /* ----------------- Employee dashboard card ------------------ */
+        .emp-welcome {
+            background: linear-gradient(135deg, var(--regal-navy) 0%, #1e3468 100%);
+            border-radius: 16px; padding: 2rem; color: #fff;
+            margin-bottom: 1.5rem; display: flex;
+            align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+        }
+        .emp-welcome h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: .3rem; }
+        .emp-welcome p  { font-size: .88rem; opacity: .78; }
+        .emp-avatar-lg  {
+            width: 60px; height: 60px; background: var(--ocean-mist);
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 1.5rem; font-weight: 700;
+            color: #fff; flex-shrink: 0;
+        }
+        .emp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .emp-grid { grid-template-columns: 1fr; } }
+
+        /* ----- Check-in status bar --------------------------*/
+        .checkin-strip {
+            background: #fff; border: 1px solid #e5e7eb;
+            border-radius: 12px; padding: 1.25rem 1.5rem;
+            display: flex; align-items: center;
+            justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .checkin-strip .status-info { display: flex; align-items: center; gap: .75rem; }
+        .ci-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .ci-dot.in   { background: var(--ocean-mist); }
+        .ci-dot.out  { background: var(--old-rose); }
+        .ci-dot.none { background: #ccc; }
+        .checkin-strip .label { font-weight: 600; color: var(--regal-navy); font-size: .9rem; }
+        .checkin-strip .sublabel { font-size: .78rem; color: var(--text-muted); margin-top: .1rem; }
+        .ci-actions { display: flex; gap: .6rem; }
+        .btn-ci {
+            padding: .5rem 1.1rem; border-radius: 8px; font-size: .85rem;
+            font-weight: 700; cursor: pointer; border: none;
+            display: flex; align-items: center; gap: .4rem;
+            transition: opacity .2s; font-family: inherit;
+        }
+        .btn-ci:disabled { opacity: .4; cursor: not-allowed; }
+        .btn-ci.in  { background: var(--ocean-mist); color: #fff; }
+        .btn-ci.out { background: var(--old-rose); color: #fff; }
+        .btn-ci:hover:not(:disabled) { opacity: .88; }
+
+        /* ----------- Stat cells ------------------*/
+        .stat-row {
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: .75rem; margin-bottom: 1.5rem;
+        }
+        .stat-cell {
+            background: #fff; border: 1px solid #e5e7eb;
+            border-radius: 10px; padding: 1rem; text-align: center;
+        }
+        .stat-cell .val { font-size: 1.6rem; font-weight: 700; color: var(--regal-navy); }
+        .stat-cell .lbl { font-size: .72rem; color: var(--text-muted); margin-top: .2rem; }
+
+        /* -------- No-link notice ---------------------------- */
+        .no-link-card {
+            background: #fff; border: 1.5px dashed #d1d5db;
+            border-radius: 12px; padding: 2.5rem; text-align: center;
+        }
+        .no-link-card i { font-size: 2.5rem; color: var(--wisteria-blue); margin-bottom: 1rem; }
+        .no-link-card h3 { color: var(--regal-navy); margin-bottom: .5rem; }
+        .no-link-card p  { color: var(--text-muted); font-size: .87rem; }
+    </style>
+</head>
+<body>
+
+<!-- Fix 4: NO hardcoded <aside> here. sidebar.js injects it. -->
+<main class="main-wrap">
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="sidebar-toggle" id="sidebar-toggle">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="page-title" id="page-title">Dashboard</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topbar-date"></span>
+        </div>
+    </header>
+    <div class="content-area">
+        <div id="alert-area"></div>
+        <div id="dashboard-content">
+            <div style="padding:2rem;color:var(--text-muted)">
+                <span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--regal-navy)"></span>
+                Loading…
+            </div>
+        </div>
+    </div>
+</main>
+
+<script src="/static/base.js"></script>
+<script src="/static/sidebar.js"></script>
+<script>
+(async () => {
+    const user = await initPage('dashboard');
+    if (!user) return;
+
+    try {
+        const res  = await fetch('/api/dashboard');
+        const data = await res.json();
+
+        if (data.error) {
+            showAlert('Dashboard error: ' + data.error);
+            return;
+        }
+
+        if (data.role === 'EMPLOYEE') {
+            renderEmployeeDashboard(data, user);
+        } else {
+            renderAdminDashboard(data);
+        }
+    } catch (e) {
+        showAlert('Failed to load dashboard.');
+    }
+})();
+
+// ---------------------------------------------------------
+// EMPLOYEE DASHBOARD
+// ---------------------------------------------------------
+function renderEmployeeDashboard(data, user) {
+    const container = document.getElementById('dashboard-content');
+    const initials  = (data.name || 'U').trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+
+    // Account not linked
+    if (!data.emp_linked) {
+        container.innerHTML = `
+            <div class="no-link-card">
+                <i class="fa-solid fa-link-slash"></i>
+                <h3>Account not linked</h3>
+                <p>${data.message}</p>
+            </div>`;
+        return;
+    }
+
+    // Build today's status
+    const att = data.today_att;
+    let ciDotClass = 'none', ciLabel = 'Not checked in yet', ciSub = 'Tap Check In to start your day';
+    if (att && att.check_out) {
+        ciDotClass = 'out'; ciLabel = `Checked out at ${att.check_out}`;
+        ciSub = `Checked in: ${att.check_in} · Overtime: ${att.overtime}h`;
+    } else if (att && att.check_in) {
+        ciDotClass = 'in'; ciLabel = `Checked in at ${att.check_in}`;
+        ciSub = 'Clock is running — check out when you leave';
+    }
+
+    const canCheckIn  = !att || (!att.check_in);
+    const canCheckOut = att && att.check_in && !att.check_out;
+
+    // Payslips table rows
+    const payRows = data.payslips && data.payslips.length
+        ? data.payslips.map(p => `
+            <tr>
+                <td><strong>${p.month} ${p.year}</strong></td>
+                <td>PKR ${fmtNum(p.net)}</td>
+                <td>${statusBadge(p.status)}</td>
+                <td>${p.date}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="4" class="empty-row">No payslips yet.</td></tr>';
+
+    const stats = data.att_stats || {};
+    const prof  = data.profile   || {};
+
+    container.innerHTML = `
+        <!-- Welcome banner -->
+        <div class="emp-welcome">
+            <div>
+                <h2>Welcome back, ${(data.name || 'Employee').split(' ')[0]}!</h2>
+                <p>${prof.title || 'Employee'} &nbsp;·&nbsp; ${prof.dept || '—'}</p>
+                <p style="margin-top:.5rem;font-size:.8rem;opacity:.6">
+                    ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}
+                </p>
+            </div>
+            <div class="emp-avatar-lg">${initials}</div>
+        </div>
+
+        <!-- Check-in strip -->
+        <div class="checkin-strip">
+            <div class="status-info">
+                <div class="ci-dot ${ciDotClass}"></div>
+                <div>
+                    <div class="label">${ciLabel}</div>
+                    <div class="sublabel">${ciSub}</div>
+                </div>
+            </div>
+            <div class="ci-actions">
+                <button class="btn-ci in"  id="btn-ci"  onclick="doCheckIn()"  ${canCheckIn  ? '' : 'disabled'}>
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Check In
+                </button>
+                <button class="btn-ci out" id="btn-co"  onclick="doCheckOut()" ${canCheckOut ? '' : 'disabled'}>
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Check Out
+                </button>
+            </div>
+        </div>
+
+        <!-- Stat row -->
+        <div class="stat-row">
+            <div class="stat-cell">
+                <div class="val text-green">${stats.present || 0}</div>
+                <div class="lbl">Present this month</div>
+            </div>
+            <div class="stat-cell">
+                <div class="val text-red">${stats.absent || 0}</div>
+                <div class="lbl">Absent this month</div>
+            </div>
+            <div class="stat-cell">
+                <div class="val" style="color:var(--wisteria-blue)">${stats.overtime || 0}h</div>
+                <div class="lbl">Overtime this month</div>
+            </div>
+        </div>
+
+        <!-- Two-column grid -->
+        <div class="emp-grid">
+            <!-- My payslips -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-money-bill-wave" style="color:var(--ocean-mist)"></i> My Payslips</h3>
+                    <span class="badge badge-blue">YTD: PKR ${fmtNum(data.ytd_pay || 0)}</span>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Period</th><th>Net Pay</th><th>Status</th><th>Date</th></tr></thead>
+                    <tbody>${payRows}</tbody>
+                </table>
+                <div class="table-footer">
+                    <a href="/payroll" style="color:var(--wisteria-blue);font-size:.8rem">View all payslips →</a>
+                </div>
+            </div>
+
+            <!-- My profile summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-user" style="color:var(--old-rose)"></i> My Profile</h3>
+                    <a href="/employees/view/${data.emp_id}" class="btn-xs btn-ghost">View full profile</a>
+                </div>
+                <div style="padding:1.25rem">
+                    <div style="display:grid;gap:.75rem">
+                        <div class="meta-item">
+                            <span class="meta-label">Department</span>
+                            <span class="badge badge-blue">${prof.dept || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Designation</span>
+                            <span>${prof.title || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Salary</span>
+                            <strong>PKR ${fmtNum(prof.salary || 0)}</strong>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Hire Date</span>
+                            <span>${prof.hire_date || '—'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Status</span>
+                            ${statusBadge(prof.status || 'ACTIVE')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick links for employee -->
+            <div class="card" style="grid-column:1/-1">
+                <div class="card-header"><h3>Quick Access</h3></div>
+                <div class="quick-actions">
+                    <a href="/attendance" class="quick-btn">
+                        <i class="fa-solid fa-clipboard-list"></i> My Attendance
+                    </a>
+                    <a href="/payroll" class="quick-btn">
+                        <i class="fa-solid fa-money-bill-wave"></i> My Payslips
+                    </a>
+                    <a href="/employees/view/${data.emp_id}" class="quick-btn">
+                        <i class="fa-solid fa-user"></i> My Profile
+                    </a>
+                    <a href="/change-password" class="quick-btn">
+                        <i class="fa-solid fa-key"></i> Change Password
+                    </a>
+                </div>
+            </div>
+        </div>`;
+}
+
+// ---------------------------------------------------------
+// ADMIN DASHBOARD
+// ---------------------------------------------------------
+function renderAdminDashboard(data) {
+    const container = document.getElementById('dashboard-content');
+
+    // Department bars
+    const maxCount = Math.max(...(data.dept_counts || []).map(d => d.count), 1);
+    const deptBars = (data.dept_counts || []).map(d => `
+        <div class="dept-bar-row">
+            <div class="dept-bar-label">${d.dept}</div>
+            <div class="dept-bar-track">
+                <div class="dept-bar-fill" style="width:${Math.round(d.count/maxCount*100)}%"></div>
+            </div>
+            <div class="dept-bar-count">${d.count}</div>
+        </div>`).join('');
+
+    const empRows = (data.recent_employees || []).map(e => `
+        <tr>
+            <td><strong>${e.name}</strong></td>
+            <td><span class="badge badge-blue">${e.dept}</span></td>
+            <td>${fmtNum(e.salary)}</td>
+            <td>${e.hire_date}</td>
+        </tr>`).join('') || '<tr><td colspan="4" class="empty-row">No employees.</td></tr>';
+
+    // Dept attendance rows
+    const deptAttRows = (data.dept_attendance || []).map(d => {
+        const pct = d.total > 0 ? Math.round(d.present / d.total * 100) : 0;
+        const color = pct >= 80 ? 'var(--ocean-mist)' : pct >= 60 ? '#eab308' : 'var(--intense-cherry)';
+        return `<tr>
+            <td>${d.dept}</td>
+            <td>${d.present} / ${d.total}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                    <div style="flex:1;background:#eee;border-radius:4px;height:6px">
+                        <div style="width:${pct}%;background:${color};height:6px;border-radius:4px"></div>
+                    </div>
+                    <span style="font-size:.8rem">${pct}%</span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <!-- KPI Cards -->
+        <div class="kpi-row" style="margin-bottom:1.5rem">
+            <div class="kpi-card kpi-navy">
+                <div class="kpi-icon"><i class="fa-solid fa-users"></i></div>
+                <div class="kpi-value">${data.total_employees ?? 0}</div>
+                <div class="kpi-label">Active Employees</div>
+            </div>
+            <div class="kpi-card kpi-teal">
+                <div class="kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="kpi-value">${data.present_today ?? 0}</div>
+                <div class="kpi-label">Present Today</div>
+            </div>
+            <div class="kpi-card kpi-rose">
+                <div class="kpi-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+                <div class="kpi-value">${data.absent_today ?? 0}</div>
+                <div class="kpi-label">Absent Today</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+                <div class="kpi-value">${data.pending_payroll ?? 0}</div>
+                <div class="kpi-label">Pending Payroll</div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+            <div class="kpi-card kpi-navy" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:1.5rem">
+                <div>
+                    <div class="kpi-label">Total Payroll Paid (YTD)</div>
+                    <div class="kpi-value" style="font-size:2rem">PKR ${fmtNum(data.total_payroll ?? 0)}</div>
+                </div>
+                <i class="fa-solid fa-money-bill-wave" style="font-size:2.5rem;opacity:.3"></i>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Recent Employees -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Recent Employees</h3>
+                    <a href="/employees/add" class="btn-sm btn-primary">+ Add Employee</a>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Department</th><th>Salary (PKR)</th><th>Hire Date</th></tr></thead>
+                    <tbody>${empRows}</tbody>
+                </table>
+                <div class="table-footer">
+                    <a href="/employees" style="color:var(--wisteria-blue);font-size:.8rem">View all employees →</a>
+                </div>
+            </div>
+
+            <!-- Department Headcount -->
+            <div class="card">
+                <div class="card-header"><h3>Department Headcount</h3></div>
+                <div class="dept-bars">${deptBars || '<div class="empty-row">No data.</div>'}</div>
+            </div>
+
+            <!-- Today's Attendance by Dept -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Today's Attendance by Department</h3>
+                    <a href="/attendance/mark" class="btn-sm btn-primary">Mark Attendance</a>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Department</th><th>Present / Total</th><th>Rate</th></tr></thead>
+                    <tbody>${deptAttRows || '<tr><td colspan="3" class="empty-row">No attendance data today.</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header"><h3>Quick Actions</h3></div>
+                <div class="quick-actions">
+                    <a href="/employees/add"         class="quick-btn"><i class="fa-solid fa-plus"></i> Add Employee</a>
+                    <a href="/attendance/mark"        class="quick-btn"><i class="fa-solid fa-clipboard-list"></i> Mark Attendance</a>
+                    <a href="/payroll/generate"       class="quick-btn"><i class="fa-solid fa-money-bills"></i> Generate Payroll</a>
+                    <a href="/reports"                class="quick-btn"><i class="fa-solid fa-chart-bar"></i> View Reports</a>
+                    <a href="/showcase"               class="quick-btn"><i class="fa-solid fa-database"></i> SQL Showcase</a>
+                    <a href="/reports/audit-log"      class="quick-btn"><i class="fa-solid fa-magnifying-glass"></i> Audit Log</a>
+                </div>
+            </div>
+        </div>`;
+}
+
+// ---------------------------------------------------------
+// CHECK-IN / CHECK-OUT (employee)
+// ---------------------------------------------------------
+async function doCheckIn() {
+    const btn = document.getElementById('btn-ci');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+        const res  = await fetch('/api/attendance/checkin', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { showAlert(data.message, 'success'); setTimeout(() => location.reload(), 1200); }
+        else { showAlert(data.message || 'Check-in failed.'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Check In'; }
+    } catch { showAlert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Check In'; }
+}
+
+async function doCheckOut() {
+    const btn = document.getElementById('btn-co');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    try {
+        const res  = await fetch('/api/attendance/checkout', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { showAlert(data.message, 'success'); setTimeout(() => location.reload(), 1200); }
+        else { showAlert(data.message || 'Check-out failed.'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-from-bracket"></i> Check Out'; }
+    } catch { showAlert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-from-bracket"></i> Check Out'; }
+}
+</script>
+</body>
+</html>
+

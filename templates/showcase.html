@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Showcase / HRMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        .showcase-hero {
+            background: linear-gradient(135deg, var(--regal-navy) 0%, #1e3468 60%, #2d4a8a 100%);
+            border-radius: 16px; padding: 2rem; color: #fff;
+            margin-bottom: 2rem; position: relative; overflow: hidden;
+        }
+        .showcase-hero::after {
+            content: '<SQL>';
+            position: absolute; right: 2rem; top: 50%; transform: translateY(-50%);
+            font-family: 'DM Mono', monospace; font-size: 4rem; font-weight: 500;
+            opacity: .08; color: #fff; pointer-events: none;
+        }
+        .showcase-hero h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: .4rem; }
+        .showcase-hero p  { font-size: .88rem; opacity: .75; max-width: 500px; }
+        .feature-tags { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+        .feat-tag {
+            background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+            border-radius: 20px; padding: .2rem .75rem;
+            font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.9);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Tabs */
+        .tab-nav {
+            display: flex; gap: 0; border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 1.5rem; overflow-x: auto;
+        }
+        .tab-btn {
+            background: none; border: none; padding: .7rem 1.2rem;
+            font-size: .87rem; font-weight: 600; color: var(--text-muted);
+            cursor: pointer; border-bottom: 2px solid transparent;
+            margin-bottom: -2px; white-space: nowrap;
+            transition: color .15s, border-color .15s; font-family: inherit;
+        }
+        .tab-btn.active { color: var(--regal-navy); border-bottom-color: var(--regal-navy); }
+        .tab-btn i { margin-right: .4rem; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* SQL display */
+        .sql-block {
+            background: #0f1523; border-radius: 10px;
+            padding: 1rem 1.25rem; margin: 1rem 0;
+            font-family: 'DM Mono', monospace; font-size: .78rem;
+            color: #a8c4f0; line-height: 1.7; overflow-x: auto;
+        }
+        .sql-block .kw  { color: #7dd3fc; font-weight: 700; }  /* keywords */
+        .sql-block .fn  { color: #a78bfa; }                     /* functions */
+        .sql-block .str { color: #86efac; }                     /* strings */
+        .sql-block .cm  { color: #4b5563; font-style: italic; } /* comments */
+
+        /* Result area */
+        .result-area { margin-top: 1.25rem; }
+        .result-banner {
+            display: flex; align-items: center; gap: .6rem;
+            padding: .75rem 1rem; border-radius: 8px;
+            font-size: .87rem; font-weight: 600; margin-bottom: 1rem;
+        }
+        .result-banner.success { background: rgba(106,190,167,.1); color: #0F6E56; border: 1px solid rgba(106,190,167,.25); }
+        .result-banner.error   { background: rgba(195,49,73,.08);  color: var(--intense-cherry); border: 1px solid rgba(195,49,73,.2); }
+
+        /* ACID steps */
+        .acid-steps { display: flex; flex-direction: column; gap: .6rem; }
+        .acid-step {
+            display: flex; gap: 1rem; align-items: flex-start;
+            background: #f8faff; border: 1px solid #e5e7eb;
+            border-radius: 8px; padding: .75rem 1rem;
+        }
+        .acid-step .step-num {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: var(--regal-navy); color: #fff;
+            font-size: .75rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .acid-step .step-cmd {
+            font-family: 'DM Mono', monospace; font-size: .78rem;
+            color: var(--regal-navy); font-weight: 600; margin-bottom: .2rem;
+        }
+        .acid-step .step-res { font-size: .82rem; color: var(--text-muted); }
+
+        /* Join selector buttons */
+        .join-btns { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .join-btn {
+            padding: .45rem .9rem; border-radius: 8px; font-size: .82rem;
+            font-weight: 600; cursor: pointer; border: 1.5px solid #d1d5db;
+            background: #fff; color: var(--regal-navy); transition: all .15s;
+            font-family: inherit;
+        }
+        .join-btn.active, .join-btn:hover {
+            background: var(--regal-navy); color: #fff; border-color: var(--regal-navy);
+        }
+
+        /* Salary change rows */
+        .change-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .6rem 0; border-bottom: 1px solid #f0f2f7;
+        }
+        .change-row:last-child { border-bottom: none; }
+
+        /* Scrollable result table */
+        .result-table-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<main class="main-wrap">
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <div class="page-title">SQL Showcase</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topbar-date"></span>
+        </div>
+    </header>
+    <div class="content-area">
+        <div id="alert-area"></div>
+
+        <!-- Hero -->
+        <div class="showcase-hero">
+            <h1><i class="fa-solid fa-database"></i> &nbsp;Database Feature Showcase</h1>
+            <p>Live demonstration of Oracle ADBMS features implemented in this HRMS — stored procedures, views, triggers, ACID transactions, and complex SQL queries running against real data.</p>
+            <div class="feature-tags">
+                <span class="feat-tag">Stored Procedures</span>
+                <span class="feat-tag">Virtual Views</span>
+                <span class="feat-tag">ACID + SAVEPOINT</span>
+                <span class="feat-tag">INNER · LEFT · SELF · FULL JOIN</span>
+                <span class="feat-tag">Subqueries</span>
+                <span class="feat-tag">GROUP BY · HAVING</span>
+                <span class="feat-tag">Triggers</span>
+                <span class="feat-tag">Indexes</span>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('views')"><i class="fa-solid fa-table"></i>Views</button>
+            <button class="tab-btn" onclick="switchTab('procs')"><i class="fa-solid fa-cogs"></i>Stored Procedures</button>
+            <button class="tab-btn" onclick="switchTab('acid')"><i class="fa-solid fa-shield-halved"></i>ACID Demo</button>
+            <button class="tab-btn" onclick="switchTab('joins')"><i class="fa-solid fa-code-branch"></i>JOIN Explorer</button>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════
+             TAB 1: VIEWS
+        ══════════════════════════════════════════════════════ -->
+        <div id="tab-views" class="tab-panel active">
+            <div style="display:grid;gap:1.5rem">
+
+                <!-- vw_employee_details -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-eye" style="color:var(--wisteria-blue)"></i> &nbsp;vw_employee_details</h3>
+                        <button class="btn-primary btn-sm" onclick="loadView('employee-details', this)">
+                            <i class="fa-solid fa-play"></i> Run View
+                        </button>
+                    </div>
+                    <div style="padding:.75rem 1.25rem">
+                        <p style="font-size:.85rem;color:var(--text-muted)">
+                            Virtual table joining <strong>employees → departments → designations → employees (manager self-join)</strong>.
+                            Shows all active employees with full context in one query.
+                        </p>
+                        <div class="sql-block">
+<span class="kw">CREATE OR REPLACE VIEW</span> vw_employee_details <span class="kw">AS</span>
+<span class="kw">SELECT</span> e.emp_id, e.first_name <span class="kw">||</span> <span class="str">' '</span> <span class="kw">||</span> e.last_name <span class="kw">AS</span> full_name,
+       e.email, e.salary, e.hire_date, e.status,
+       d.dept_name, dg.title <span class="kw">AS</span> designation, dg.grade,
+       m.first_name <span class="kw">||</span> <span class="str">' '</span> <span class="kw">||</span> m.last_name <span class="kw">AS</span> manager_name
+<span class="kw">FROM</span> employees e
+<span class="kw">LEFT JOIN</span> departments  d  <span class="kw">ON</span> e.dept_id   = d.dept_id
+<span class="kw">LEFT JOIN</span> designations dg <span class="kw">ON</span> e.desig_id  = dg.desig_id
+<span class="kw">LEFT JOIN</span> employees    m  <span class="kw">ON</span> e.manager_id = m.emp_id  <span class="cm">-- SELF JOIN</span>
+<span class="kw">WHERE</span> e.status = <span class="str">'ACTIVE'</span>;</div>
+                    </div>
+                    <div id="result-employee-details" class="result-area" style="padding:.5rem 1.25rem 1.25rem"></div>
+                </div>
+
+                <!-- vw_attendance_summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-eye" style="color:var(--ocean-mist)"></i> &nbsp;vw_attendance_summary</h3>
+                        <button class="btn-primary btn-sm btn-ocean" onclick="loadView('attendance-summary', this)">
+                            <i class="fa-solid fa-play"></i> Run View
+                        </button>
+                    </div>
+                    <div style="padding:.75rem 1.25rem">
+                        <p style="font-size:.85rem;color:var(--text-muted)">
+                            Uses <strong>CASE WHEN · COUNT · SUM · ROUND · NULLIF</strong> to compute per-employee attendance stats. Demonstrates conditional aggregation.
+                        </p>
+                        <div class="sql-block">
+<span class="kw">SELECT</span> e.emp_id, e.first_name <span class="kw">||</span> <span class="str">' '</span> <span class="kw">||</span> e.last_name <span class="kw">AS</span> full_name,
+       <span class="fn">COUNT</span>(<span class="kw">CASE WHEN</span> a.status = <span class="str">'PRESENT'</span> <span class="kw">THEN</span> 1 <span class="kw">END</span>) <span class="kw">AS</span> present_days,
+       <span class="fn">COUNT</span>(<span class="kw">CASE WHEN</span> a.status = <span class="str">'ABSENT'</span>  <span class="kw">THEN</span> 1 <span class="kw">END</span>) <span class="kw">AS</span> absent_days,
+       <span class="fn">NVL</span>(<span class="fn">SUM</span>(a.overtime_hr), 0)                           <span class="kw">AS</span> total_overtime,
+       <span class="fn">ROUND</span>(
+           <span class="fn">COUNT</span>(<span class="kw">CASE WHEN</span> a.status=<span class="str">'PRESENT'</span> <span class="kw">THEN</span> 1 <span class="kw">END</span>) * 100.0
+           / <span class="fn">NULLIF</span>(<span class="fn">COUNT</span>(a.att_id), 0), 1)              <span class="kw">AS</span> attendance_pct
+<span class="kw">FROM</span> employees e
+<span class="kw">LEFT JOIN</span> attendance  a <span class="kw">ON</span> e.emp_id  = a.emp_id
+<span class="kw">LEFT JOIN</span> departments d <span class="kw">ON</span> e.dept_id = d.dept_id
+<span class="kw">WHERE</span> e.status = <span class="str">'ACTIVE'</span>
+<span class="kw">GROUP BY</span> e.emp_id, e.first_name, e.last_name, d.dept_name;</div>
+                    </div>
+                    <div id="result-attendance-summary" class="result-area" style="padding:.5rem 1.25rem 1.25rem"></div>
+                </div>
+
+                <!-- vw_dept_payroll_summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-eye" style="color:var(--old-rose)"></i> &nbsp;vw_dept_payroll_summary</h3>
+                        <button class="btn-primary btn-sm" style="background:var(--old-rose)" onclick="loadView('dept-payroll', this)">
+                            <i class="fa-solid fa-play"></i> Run View
+                        </button>
+                    </div>
+                    <div style="padding:.75rem 1.25rem">
+                        <p style="font-size:.85rem;color:var(--text-muted)">
+                            Department-level payroll rollup using <strong>INNER JOIN · GROUP BY · SUM</strong> across payroll, employees, and departments.
+                        </p>
+                        <div class="sql-block">
+<span class="kw">SELECT</span> d.dept_name, p.pay_month, p.pay_year,
+       <span class="fn">COUNT</span>(p.pay_id)   <span class="kw">AS</span> employee_count,
+       <span class="fn">SUM</span>(p.basic_pay)  <span class="kw">AS</span> total_basic,
+       <span class="fn">SUM</span>(p.bonus)      <span class="kw">AS</span> total_bonus,
+       <span class="fn">SUM</span>(p.deductions) <span class="kw">AS</span> total_deductions,
+       <span class="fn">SUM</span>(p.net_pay)    <span class="kw">AS</span> total_net_pay
+<span class="kw">FROM</span> payroll p
+<span class="kw">JOIN</span> employees   e <span class="kw">ON</span> p.emp_id  = e.emp_id
+<span class="kw">JOIN</span> departments d <span class="kw">ON</span> e.dept_id = d.dept_id
+<span class="kw">GROUP BY</span> d.dept_name, p.pay_month, p.pay_year
+<span class="kw">ORDER BY</span> p.pay_year <span class="kw">DESC</span>, p.pay_month, d.dept_name;</div>
+                    </div>
+                    <div id="result-dept-payroll" class="result-area" style="padding:.5rem 1.25rem 1.25rem"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════
+             TAB 2: STORED PROCEDURES
+        ══════════════════════════════════════════════════════ -->
+        <div id="tab-procs" class="tab-panel">
+            <div style="display:grid;gap:1.5rem">
+
+                <!-- sp_generate_payroll -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-cogs" style="color:var(--wisteria-blue)"></i> &nbsp;sp_generate_payroll</h3>
+                    </div>
+                    <div style="padding:.75rem 1.25rem">
+                        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1rem">
+                            Iterates all active employees with a <strong>cursor FOR loop</strong>, calculates bonus from overtime hours (500/hr),
+                            applies 5% deductions + 10% tax, inserts payroll with COMMIT. Skips already-generated records.
+                        </p>
+                        <div class="sql-block">
+<span class="kw">CREATE OR REPLACE PROCEDURE</span> sp_generate_payroll (
+    p_month <span class="kw">IN</span> <span class="fn">VARCHAR2</span>,
+    p_year  <span class="kw">IN</span> <span class="fn">NUMBER</span>
+) <span class="kw">AS</span>
+    v_overtime <span class="fn">NUMBER</span>; v_bonus <span class="fn">NUMBER</span>; ...
+<span class="kw">BEGIN</span>
+    <span class="kw">FOR</span> emp <span class="kw">IN</span> (<span class="kw">SELECT</span> emp_id, salary <span class="kw">FROM</span> employees <span class="kw">WHERE</span> status=<span class="str">'ACTIVE'</span>) <span class="kw">LOOP</span>
+        <span class="cm">-- Skip if already generated</span>
+        v_bonus      := v_overtime * 500;
+        v_deductions := v_basic * 0.05;
+        v_tax        := v_basic * 0.10;
+        v_net        := v_basic + v_bonus - v_deductions - v_tax;
+        <span class="kw">INSERT INTO</span> payroll ...;
+    <span class="kw">END LOOP</span>;
+    <span class="kw">COMMIT</span>;
+<span class="kw">END</span>;</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.75rem;align-items:end;margin-top:1rem">
+                            <div class="form-group" style="margin:0">
+                                <label>Pay Month</label>
+                                <select id="sp-month" class="filter-select" style="width:100%">
+                                    <option>January</option><option>February</option><option>March</option>
+                                    <option>April</option><option>May</option><option>June</option>
+                                    <option>July</option><option>August</option><option>September</option>
+                                    <option>October</option><option>November</option><option>December</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0">
+                                <label>Pay Year</label>
+                                <select id="sp-year" class="filter-select" style="width:100%">
+                                    <option value="2024">2024</option>
+                                    <option value="2025" selected>2025</option>
+                                    <option value="2026">2026</option>
+                                </select>
+                            </div>
+                            <button class="btn-primary" onclick="runSpGeneratePayroll(this)">
+                                <i class="fa-solid fa-play"></i> Execute Procedure
+                            </button>
+                        </div>
+                    </div>
+                    <div id="result-sp-payroll" class="result-area" style="padding:.5rem 1.25rem 1.25rem"></div>
+                </div>
+
+                <!-- sp_dept_salary_raise -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-cogs" style="color:var(--ocean-mist)"></i> &nbsp;sp_dept_salary_raise</h3>
+                    </div>
+                    <div style="padding:.75rem 1.25rem">
+                        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1rem">
+                            Uses <strong>SAVEPOINT · COMMIT · ROLLBACK</strong> to safely apply a % salary raise to a department.
+                            Triggers <code>trg_salary_history</code> automatically on each row updated.
+                        </p>
+                        <div class="sql-block">
+<span class="kw">CREATE OR REPLACE PROCEDURE</span> sp_dept_salary_raise (
+    p_dept_id   <span class="kw">IN</span> <span class="fn">NUMBER</span>,
+    p_raise_pct <span class="kw">IN</span> <span class="fn">NUMBER</span>
+) <span class="kw">AS</span>
+<span class="kw">BEGIN</span>
+    <span class="kw">SAVEPOINT</span> before_raise;
+    <span class="kw">UPDATE</span> employees
+    <span class="kw">SET</span> salary = salary * (1 + p_raise_pct / 100)
+    <span class="kw">WHERE</span> dept_id = p_dept_id <span class="kw">AND</span> status = <span class="str">'ACTIVE'</span>;
+    <span class="kw">COMMIT</span>;
+<span class="kw">EXCEPTION WHEN OTHERS THEN</span>
+    <span class="kw">ROLLBACK TO</span> before_raise;
+<span class="kw">END</span>;</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.75rem;align-items:end;margin-top:1rem">
+                            <div class="form-group" style="margin:0">
+                                <label>Department</label>
+                                <select id="raise-dept" class="filter-select" style="width:100%">
+                                    <option value="">Loading…</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0">
+                                <label>Raise % (e.g. 10 = 10%)</label>
+                                <input type="number" id="raise-pct" class="filter-input" value="5" min="0.1" max="100" step="0.5" style="width:100%">
+                            </div>
+                            <button class="btn-primary btn-ocean" onclick="runSpSalaryRaise(this)">
+                                <i class="fa-solid fa-play"></i> Execute Procedure
+                            </button>
+                        </div>
+                    </div>
+                    <div id="result-sp-raise" class="result-area" style="padding:.5rem 1.25rem 1.25rem"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════
+             TAB 3: ACID DEMO
+        ══════════════════════════════════════════════════════ -->
+        <div id="tab-acid" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-shield-halved" style="color:var(--regal-navy)"></i> &nbsp;ACID Transaction Demo</h3>
+                </div>
+                <div style="padding:1.25rem">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
+                        <div style="background:#f8faff;border-radius:10px;padding:1rem">
+                            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--regal-navy);margin-bottom:.5rem">
+                                ACID Properties
+                            </div>
+                            <div style="font-size:.83rem;color:var(--text-muted);line-height:1.7">
+                                <strong style="color:var(--regal-navy)">A</strong>tomicity — all or nothing<br>
+                                <strong style="color:var(--regal-navy)">C</strong>onsistency — valid state always<br>
+                                <strong style="color:var(--regal-navy)">I</strong>solation — concurrent transactions<br>
+                                <strong style="color:var(--regal-navy)">D</strong>urability — committed = permanent
+                            </div>
+                        </div>
+                        <div style="background:#f8faff;border-radius:10px;padding:1rem">
+                            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--regal-navy);margin-bottom:.5rem">
+                                What This Demo Does
+                            </div>
+                            <div style="font-size:.83rem;color:var(--text-muted);line-height:1.7">
+                                Sets a SAVEPOINT → modifies salary →
+                                reads the in-transaction value →
+                                then either COMMITs (durable change)
+                                or ROLLBACKs to savepoint (atomicity).
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sql-block" style="margin-bottom:1.25rem">
+<span class="kw">BEGIN</span>
+    <span class="kw">SAVEPOINT</span> acid_demo_sp;                                   <span class="cm">-- mark restore point</span>
+    <span class="kw">UPDATE</span> employees <span class="kw">SET</span> salary = salary + :amount
+    <span class="kw">WHERE</span> emp_id = :emp_id;                                    <span class="cm">-- dirty change</span>
+    <span class="kw">SELECT</span> salary <span class="kw">FROM</span> employees <span class="kw">WHERE</span> emp_id = :emp_id;       <span class="cm">-- read within txn</span>
+
+    <span class="cm">-- Choose path:</span>
+    <span class="kw">COMMIT</span>;                                                    <span class="cm">-- Durability: change persists</span>
+    <span class="cm">-- OR --</span>
+    <span class="kw">ROLLBACK TO SAVEPOINT</span> acid_demo_sp;                        <span class="cm">-- Atomicity: undo</span>
+<span class="kw">END</span>;</div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:.75rem;align-items:end;margin-bottom:1.25rem">
+                        <div class="form-group" style="margin:0">
+                            <label>Employee</label>
+                            <select id="acid-emp" class="filter-select" style="width:100%">
+                                <option value="">Loading…</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin:0">
+                            <label>Salary Change (PKR)</label>
+                            <input type="number" id="acid-amount" class="filter-input" value="5000" step="1000" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0">
+                            <label>Transaction Action</label>
+                            <select id="acid-action" class="filter-select" style="width:100%">
+                                <option value="rollback">ROLLBACK (demonstrate Atomicity)</option>
+                                <option value="commit">COMMIT (demonstrate Durability)</option>
+                            </select>
+                        </div>
+                        <button class="btn-primary" onclick="runAcidDemo(this)">
+                            <i class="fa-solid fa-play"></i> Run Demo
+                        </button>
+                    </div>
+
+                    <div id="result-acid" class="result-area"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════
+             TAB 4: JOIN EXPLORER
+        ══════════════════════════════════════════════════════ -->
+        <div id="tab-joins" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-code-branch" style="color:var(--regal-navy)"></i> &nbsp;Interactive JOIN Explorer</h3>
+                </div>
+                <div style="padding:1.25rem">
+                    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1rem">
+                        Select a join type or query pattern to run it live against your data and see the SQL + results.
+                    </p>
+                    <div class="join-btns">
+                        <button class="join-btn active" onclick="runJoin('inner',  this)">INNER JOIN</button>
+                        <button class="join-btn"        onclick="runJoin('left',   this)">LEFT JOIN</button>
+                        <button class="join-btn"        onclick="runJoin('self',   this)">SELF JOIN</button>
+                        <button class="join-btn"        onclick="runJoin('full',   this)">FULL OUTER JOIN</button>
+                        <button class="join-btn"        onclick="runJoin('subquery', this)">Subquery (AVG)</button>
+                        <button class="join-btn"        onclick="runJoin('groupby', this)">GROUP BY + HAVING</button>
+                    </div>
+                    <div id="join-label" style="font-size:.85rem;color:var(--wisteria-blue);font-weight:600;margin:.75rem 0 .25rem"></div>
+                    <div id="join-sql" class="sql-block" style="display:none"></div>
+                    <div id="result-joins" class="result-area"></div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- end content-area -->
+</main>
+
+<script src="/static/base.js"></script>
+<script src="/static/sidebar.js"></script>
+<script>
+let depts    = [];
+let employees = [];
+
+(async () => {
+    await initPage('showcase');
+
+    // Load departments and employees for dropdowns
+    try {
+        const res  = await fetch('/api/showcase/departments');
+        const data = await res.json();
+        depts     = data.departments || [];
+        employees = data.employees   || [];
+
+        const deptSel = document.getElementById('raise-dept');
+        deptSel.innerHTML = depts.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+
+        const empSel = document.getElementById('acid-emp');
+        empSel.innerHTML = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+
+        // Set current month default
+        const months = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+        document.getElementById('sp-month').value = months[new Date().getMonth()];
+    } catch (e) {
+        console.error(e);
+    }
+
+    // Auto-load first join
+    await runJoin('inner', document.querySelector('.join-btn.active'));
+})();
+
+// ── Tab switching ─────────────────────────────────────────────────────────
+function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+}
+
+// ── Load a view ───────────────────────────────────────────────────────────
+async function loadView(viewName, btn) {
+    const resultEl = document.getElementById('result-' + viewName);
+    resultEl.innerHTML = '<div style="padding:.5rem;color:var(--text-muted)"><span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--regal-navy)"></span> Querying view…</div>';
+    btn.disabled = true;
+
+    try {
+        const res  = await fetch('/api/showcase/view-' + viewName);
+        const data = await res.json();
+        if (data.error) {
+            resultEl.innerHTML = `<div class="result-banner error"><i class="fa-solid fa-triangle-exclamation"></i> ${data.error}</div>`;
+        } else {
+            resultEl.innerHTML = `
+                <div class="result-banner success">
+                    <i class="fa-solid fa-circle-check"></i>
+                    View returned ${data.count} row(s) — rendered below
+                </div>
+                <div class="result-table-wrap">${buildTable(data.rows)}</div>`;
+        }
+    } catch (e) {
+        resultEl.innerHTML = `<div class="result-banner error">Network error: ${e.message}</div>`;
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Re-run';
+}
+
+// ── Run sp_generate_payroll ───────────────────────────────────────────────
+async function runSpGeneratePayroll(btn) {
+    const pay_month = document.getElementById('sp-month').value;
+    const pay_year  = document.getElementById('sp-year').value;
+    const resultEl  = document.getElementById('result-sp-payroll');
+
+    resultEl.innerHTML = '<div style="padding:.5rem;color:var(--text-muted)"><span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--regal-navy)"></span> Executing procedure…</div>';
+    btn.disabled = true;
+
+    try {
+        const res  = await fetch('/api/showcase/sp-generate-payroll', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({pay_month, pay_year: parseInt(pay_year)})
+        });
+        const data = await res.json();
+        if (data.success) {
+            const rows = data.records.map(r => `
+                <tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td>${fmtNum(r.basic)}</td>
+                    <td class="text-green">${fmtNum(r.bonus)}</td>
+                    <td class="text-red">-${fmtNum(r.deductions)}</td>
+                    <td class="text-red">-${fmtNum(r.tax)}</td>
+                    <td><strong>${fmtNum(r.net_pay)}</strong></td>
+                    <td>${statusBadge(r.status)}</td>
+                </tr>`).join('');
+            resultEl.innerHTML = `
+                <div class="result-banner success">
+                    <i class="fa-solid fa-circle-check"></i> ${data.message}
+                    New records created: <strong>${data.new_records}</strong>
+                </div>
+                <div class="result-table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>Employee</th><th>Basic</th><th>Bonus</th><th>Deductions</th><th>Tax</th><th>Net Pay</th><th>Status</th></tr></thead>
+                        <tbody>${rows || '<tr><td colspan="7" class="empty-row">All payslips already existed.</td></tr>'}</tbody>
+                    </table>
+                </div>`;
+        } else {
+            resultEl.innerHTML = `<div class="result-banner error"><i class="fa-solid fa-triangle-exclamation"></i> ${data.message}</div>`;
+        }
+    } catch (e) {
+        resultEl.innerHTML = `<div class="result-banner error">Network error: ${e.message}</div>`;
+    }
+    btn.disabled = false;
+}
+
+// ── Run sp_dept_salary_raise ──────────────────────────────────────────────
+async function runSpSalaryRaise(btn) {
+    const dept_id   = document.getElementById('raise-dept').value;
+    const raise_pct = parseFloat(document.getElementById('raise-pct').value);
+    const resultEl  = document.getElementById('result-sp-raise');
+
+    if (!dept_id) { showAlert('Please select a department.'); return; }
+    if (!raise_pct || raise_pct <= 0) { showAlert('Please enter a valid raise %.'); return; }
+
+    if (!confirm(`Apply a ${raise_pct}% salary raise to this department? This permanently changes salaries in the database.`)) return;
+
+    resultEl.innerHTML = '<div style="padding:.5rem;color:var(--text-muted)"><span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--regal-navy)"></span> Executing procedure…</div>';
+    btn.disabled = true;
+
+    try {
+        const res  = await fetch('/api/showcase/sp-salary-raise', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({dept_id: parseInt(dept_id), raise_pct})
+        });
+        const data = await res.json();
+        if (data.success) {
+            const changeRows = data.changes.map(c => `
+                <div class="change-row">
+                    <strong>${c.name}</strong>
+                    <div style="display:flex;align-items:center;gap:.75rem">
+                        <span style="color:var(--text-muted)">${fmtNum(c.old)}</span>
+                        <i class="fa-solid fa-arrow-right" style="color:var(--text-muted);font-size:.75rem"></i>
+                        <strong>${fmtNum(c.new)}</strong>
+                        <span class="badge badge-green">+${fmtNum(c.delta)}</span>
+                    </div>
+                </div>`).join('');
+            resultEl.innerHTML = `
+                <div class="result-banner success">
+                    <i class="fa-solid fa-circle-check"></i> ${data.message}
+                    <em>trg_salary_history trigger fired automatically for each row.</em>
+                </div>
+                <div style="padding:.5rem 0">${changeRows}</div>`;
+        } else {
+            resultEl.innerHTML = `<div class="result-banner error"><i class="fa-solid fa-triangle-exclamation"></i> ${data.message}</div>`;
+        }
+    } catch (e) {
+        resultEl.innerHTML = `<div class="result-banner error">Network error: ${e.message}</div>`;
+    }
+    btn.disabled = false;
+}
+
+// ── ACID Demo ─────────────────────────────────────────────────────────────
+async function runAcidDemo(btn) {
+    const emp_id  = document.getElementById('acid-emp').value;
+    const amount  = parseFloat(document.getElementById('acid-amount').value);
+    const action  = document.getElementById('acid-action').value;
+    const resultEl = document.getElementById('result-acid');
+
+    if (!emp_id) { showAlert('Please select an employee.'); return; }
+
+    resultEl.innerHTML = '<div style="padding:.5rem;color:var(--text-muted)"><span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--regal-navy)"></span> Running transaction…</div>';
+    btn.disabled = true;
+
+    try {
+        const res  = await fetch('/api/showcase/acid-demo', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({emp_id: parseInt(emp_id), amount, action})
+        });
+        const data = await res.json();
+        if (data.success) {
+            const stepRows = data.steps.map((s, i) => `
+                <div class="acid-step">
+                    <div class="step-num">${i+1}</div>
+                    <div>
+                        <div class="step-cmd">${s.step}</div>
+                        <div class="step-res">${s.result}</div>
+                    </div>
+                </div>`).join('');
+
+            const isCommit = action === 'commit';
+            const finalNote = isCommit
+                ? `<span style="color:#0F6E56"><strong>Durability:</strong> PKR ${fmtNum(data.final_salary)} permanently written to disk.</span>`
+                : `<span style="color:var(--intense-cherry)"><strong>Atomicity:</strong> Transaction rolled back. Salary remains PKR ${fmtNum(data.final_salary)}.</span>`;
+
+            resultEl.innerHTML = `
+                <div class="result-banner ${isCommit ? 'success' : 'error'}">
+                    <i class="fa-solid fa-${isCommit ? 'circle-check' : 'rotate-left'}"></i>
+                    Transaction ${isCommit ? 'COMMITTED' : 'ROLLED BACK'} for <strong>${data.name}</strong>
+                    &nbsp;·&nbsp; ${finalNote}
+                </div>
+                <div class="acid-steps">${stepRows}</div>`;
+        } else {
+            resultEl.innerHTML = `<div class="result-banner error"><i class="fa-solid fa-triangle-exclamation"></i> ${data.message}</div>`;
+        }
+    } catch (e) {
+        resultEl.innerHTML = `<div class="result-banner error">Network error: ${e.message}</div>`;
+    }
+    btn.disabled = false;
+}
+
+// ── JOIN Explorer ─────────────────────────────────────────────────────────
+async function runJoin(type, btn) {
+    document.querySelectorAll('.join-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const resultEl = document.getElementById('result-joins');
+    const sqlEl    = document.getElementById('join-sql');
+    const labelEl  = document.getElementById('join-label');
+
+    resultEl.innerHTML = '<div style="padding:.5rem;color:var(--text-muted)"><span class="spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--regal-navy)"></span> Running query…</div>';
+
+    try {
+        const res  = await fetch('/api/showcase/joins?type=' + type);
+        const data = await res.json();
+        if (data.error) {
+            resultEl.innerHTML = `<div class="result-banner error"><i class="fa-solid fa-triangle-exclamation"></i> ${data.error}</div>`;
+            return;
+        }
+
+        labelEl.textContent = data.label;
+        sqlEl.textContent   = data.sql;
+        sqlEl.style.display = 'block';
+
+        resultEl.innerHTML = `
+            <div class="result-banner success" style="margin-top:.75rem">
+                <i class="fa-solid fa-circle-check"></i>
+                ${data.count} row(s) returned
+            </div>
+            <div class="result-table-wrap">${buildTable(data.rows)}</div>`;
+    } catch (e) {
+        resultEl.innerHTML = `<div class="result-banner error">Network error: ${e.message}</div>`;
+    }
+}
+
+// ── Generic table builder ─────────────────────────────────────────────────
+function buildTable(rows) {
+    if (!rows || !rows.length) return '<div class="empty-row">No rows returned.</div>';
+    const cols = Object.keys(rows[0]);
+    const head = cols.map(c => `<th>${c.replace(/_/g,' ')}</th>`).join('');
+    const body = rows.map(r => {
+        const cells = cols.map(c => {
+            const v = r[c];
+            if (v === null || v === undefined) return '<td class="text-muted">—</td>';
+            if (typeof v === 'number') return `<td>${fmtNum(v)}</td>`;
+            return `<td>${v}</td>`;
+        }).join('');
+        return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table class="data-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRMS / Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.75rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: .65rem 0;
+            font-size: .9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: color .15s, border-color .15s;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .tab-btn.active {
+            color: var(--regal-navy);
+            border-bottom-color: var(--regal-navy);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .strength-bar-track {
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+
+        .strength-bar-fill {
+            height: 4px;
+            border-radius: 4px;
+            width: 0;
+            transition: width .3s, background .3s;
+        }
+
+        .strength-label {
+            font-size: .72rem;
+            margin-top: 3px;
+            font-weight: 600;
+        }
+
+        .success-box {
+            background: rgba(106, 190, 167, .12);
+            border: 1px solid rgba(106, 190, 167, .3);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-align: center;
+            color: #0F6E56;
+        }
+
+        .success-box i {
+            font-size: 2rem;
+            margin-bottom: .5rem;
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="auth-page">
+    <div class="auth-container" style="max-width:440px">
+        <div class="auth-card">
+            <div class="brand">
+                <div class="brand-logo"><i class="fa-solid fa-building-user"></i></div>
+                <h1>HRMS Portal</h1>
+                <p>Human Resource Management System</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+                <button class="tab-btn" onclick="switchTab('register')">Create Account</button>
+            </div>
+
+            <div id="alert-area"></div>
+
+            <!-- ── LOGIN PANEL ── -->
+            <div id="tab-login" class="tab-panel active">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" placeholder="e.g. alice.johnson" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="login-password" placeholder="Your password"
+                            autocomplete="current-password">
+                        <button type="button" class="toggle-pw" onclick="togglePw('login-password','eye-login')">
+                            <i class="fa-regular fa-eye" id="eye-login"></i>
+                        </button>
+                    </div>
+                </div>
+                <button class="btn-primary" id="login-btn" onclick="doLogin()"
+                    style="width:100%;justify-content:center;padding:11px;margin-top:.5rem">
+                    <i class="fa-solid fa-right-to-bracket"></i> Sign In
+                </button>
+                <p class="auth-footer" style="margin-top:1rem">
+                    No account? <a href="#" onclick="switchTab('register');return false">Create one →</a>
+                </p>
+            </div>
+
+            <!-- ── REGISTER PANEL ── -->
+            <!-- ── REGISTER PANEL ── -->
+            <div id="tab-register" class="tab-panel">
+                <div id="register-form">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+                        <div class="form-group">
+                            <label for="reg-first">First Name *</label>
+                            <input type="text" id="reg-first" placeholder="Alice">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-last">Last Name *</label>
+                            <input type="text" id="reg-last" placeholder="Johnson">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-username">Username *</label>
+                        <input type="text" id="reg-username" placeholder="e.g. alice.johnson" autocomplete="off">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+                        <div class="form-group">
+                            <label for="reg-dept">Department *</label>
+                            <select id="reg-dept"
+                                style="width:100%;padding:10px 14px;border:1.5px solid rgba(37,60,120,.15);border-radius:8px;font-size:.9rem;background:#fafafa;font-family:inherit">
+                                <option value="">Loading…</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-desig">Designation *</label>
+                            <select id="reg-desig"
+                                style="width:100%;padding:10px 14px;border:1.5px solid rgba(37,60,120,.15);border-radius:8px;font-size:.9rem;background:#fafafa;font-family:inherit">
+                                <option value="">Loading…</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Password *</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="reg-password" placeholder="Min 8 characters"
+                                autocomplete="new-password">
+                            <button type="button" class="toggle-pw" onclick="togglePw('reg-password','eye-reg')">
+                                <i class="fa-regular fa-eye" id="eye-reg"></i>
+                            </button>
+                        </div>
+                        <div class="strength-bar-track">
+                            <div class="strength-bar-fill" id="strength-fill"></div>
+                        </div>
+                        <div class="strength-label" id="strength-label" style="color:var(--text-muted)"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-confirm">Confirm Password *</label>
+                        <input type="password" id="reg-confirm" placeholder="Repeat password"
+                            autocomplete="new-password">
+                        <span class="field-hint" id="match-hint"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-key">Invite Key *</label>
+                        <input type="text" id="reg-key" placeholder="Ask your admin for the key" autocomplete="off">
+                        <span class="field-hint" style="color:var(--text-muted)">
+                            <i class="fa-solid fa-circle-info"></i> Provided by your HR administrator
+                        </span>
+                    </div>
+                    <button class="btn-primary btn-ocean" id="register-btn" onclick="doRegister()"
+                        style="width:100%;justify-content:center;padding:11px;margin-top:.5rem">
+                        <i class="fa-solid fa-user-plus"></i> Create Account
+                    </button>
+                    <p class="auth-footer" style="margin-top:1rem">
+                        Already have an account? <a href="#" onclick="switchTab('login');return false">Sign in →</a>
+                    </p>
+                </div>
+                <div id="register-success" style="display:none">
+                    <div class="success-box">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <strong>Account created!</strong>
+                        <p style="margin-top:.4rem;font-size:.88rem">You can now sign in with your credentials.</p>
+                    </div>
+                    <button class="btn-primary" onclick="switchTab('login')"
+                        style="width:100%;justify-content:center;padding:11px;margin-top:1rem">
+                        Go to Sign In →
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        async function loadRegisterFormData() {
+            const deptSel = document.getElementById('reg-dept');
+            const desigSel = document.getElementById('reg-desig');
+            // Skip if already loaded successfully
+            if (deptSel.options.length > 1) return;
+
+            deptSel.innerHTML = '<option value="">Loading…</option>';
+            desigSel.innerHTML = '<option value="">Loading…</option>';
+
+            try {
+                const res = await fetch('/api/register/form-data');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                deptSel.innerHTML = '<option value="">Select Department</option>' +
+                    data.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                desigSel.innerHTML = '<option value="">Select Designation</option>' +
+                    data.designations.map(d => `<option value="${d.id}">${d.title}</option>`).join('');
+            } catch (e) {
+                console.error('Form data load failed:', e);
+                deptSel.innerHTML = '<option value="">Failed to load — check console</option>';
+                desigSel.innerHTML = '<option value="">Failed to load — check console</option>';
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.querySelectorAll('.tab-btn')[tab === 'login' ? 0 : 1].classList.add('active');
+            document.getElementById('alert-area').innerHTML = '';
+            if (tab === 'register') loadRegisterFormData();
+        }
+
+        function togglePw(inputId, eyeId) {
+            const input = document.getElementById(inputId);
+            const eye = document.getElementById(eyeId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                eye.className = 'fa-regular fa-eye-slash';
+            } else {
+                input.type = 'password';
+                eye.className = 'fa-regular fa-eye';
+            }
+        }
+
+        function showAlert(msg, type = 'error') {
+            const icon = type === 'success'
+                ? '<i class="fa-solid fa-circle-check"></i>'
+                : '<i class="fa-solid fa-triangle-exclamation"></i>';
+            document.getElementById('alert-area').innerHTML =
+                `<div class="alert alert-${type}">${icon} ${msg}</div>`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('reg-password').addEventListener('input', function () {
+                const v = this.value;
+                let score = 0;
+                if (v.length >= 8) score++;
+                if (/[A-Z]/.test(v)) score++;
+                if (/[0-9]/.test(v)) score++;
+                if (/[^A-Za-z0-9]/.test(v)) score++;
+                const fill = document.getElementById('strength-fill');
+                const label = document.getElementById('strength-label');
+                const pcts = ['0%', '30%', '55%', '78%', '100%'];
+                const colors = ['', '#ef4444', '#f97316', '#eab308', '#22c55e'];
+                const words = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+                fill.style.width = pcts[score];
+                fill.style.background = colors[score] || 'transparent';
+                label.textContent = words[score] || '';
+                label.style.color = colors[score] || 'transparent';
+            });
+
+            document.getElementById('reg-confirm').addEventListener('input', function () {
+                const match = this.value === document.getElementById('reg-password').value;
+                const hint = document.getElementById('match-hint');
+                if (!this.value) { hint.textContent = ''; return; }
+                hint.textContent = match ? '✓ Passwords match' : '✗ Passwords do not match';
+                hint.style.color = match ? '#6abea7' : '#C33149';
+            });
+        });
+
+        async function doLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            if (!username || !password) { showAlert('Please enter username and password.'); return; }
+
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Signing in…';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    showAlert(data.message || 'Login failed.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+                }
+            } catch {
+                showAlert('Network error. Please try again.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+            }
+        }
+
+        async function doRegister() {
+            const first_name = document.getElementById('reg-first').value.trim();
+            const last_name = document.getElementById('reg-last').value.trim();
+            const username = document.getElementById('reg-username').value.trim();
+            const dept_id = document.getElementById('reg-dept').value;
+            const desig_id = document.getElementById('reg-desig').value;
+            const password = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-confirm').value;
+            const invite_key = document.getElementById('reg-key').value.trim();
+
+            if (!first_name || !last_name || !username || !dept_id || !desig_id ||
+                !password || !confirm || !invite_key) {
+                showAlert('Please fill all fields.'); return;
+            }
+            if (password !== confirm) { showAlert('Passwords do not match.'); return; }
+            if (password.length < 8) { showAlert('Password must be at least 8 characters.'); return; }
+
+            const btn = document.getElementById('register-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Creating account…';
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, invite_key, first_name, last_name, dept_id, desig_id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('register-form').style.display = 'none';
+                    document.getElementById('register-success').style.display = 'block';
+                    document.getElementById('alert-area').innerHTML = '';
+                } else {
+                    showAlert(data.message || 'Registration failed.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account';
+                }
+            } catch {
+                showAlert('Network error. Please try again.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account';
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            const activeTab = document.querySelector('.tab-panel.active').id;
+            if (activeTab === 'tab-login') doLogin();
+            else doRegister();
+        });
+    </script>
+</body>
+
+</html>

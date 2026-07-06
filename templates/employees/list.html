@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employees — HRMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        .salary-cell { display:flex; align-items:center; gap:.4rem; }
+        .salary-display { cursor:pointer; border-bottom:1px dashed var(--text-muted); }
+        .salary-display:hover { color:var(--regal-navy); border-color:var(--regal-navy); }
+        .salary-edit-input {
+            width:110px; padding:.25rem .45rem; border:1.5px solid var(--wisteria-blue);
+            border-radius:6px; font-size:.87rem; font-family:inherit; outline:none;
+        }
+        .save-salary-btn {
+            padding:.2rem .5rem; font-size:.75rem; background:var(--ocean-mist);
+            color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:600;
+        }
+        .cancel-salary-btn {
+            padding:.2rem .5rem; font-size:.75rem; background:#f0f2f7;
+            color:var(--regal-navy); border:1px solid #ddd; border-radius:5px; cursor:pointer;
+        }
+        .edit-hint { font-size:.7rem; color:var(--text-muted); margin-top:.25rem; }
+    </style>
+</head>
+<body>
+
+<main class="main-wrap">
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <div class="page-title">Employees</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topbar-date"></span>
+        </div>
+    </header>
+    <div class="content-area">
+        <div id="alert-area"></div>
+
+        <div class="toolbar">
+            <div class="filter-bar">
+                <input type="text" id="search-input" placeholder="Search name or email…" class="filter-input">
+                <select id="dept-select" class="filter-select">
+                    <option value="">All Departments</option>
+                </select>
+                <select id="status-select" class="filter-select">
+                    <option value="">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                </select>
+                <button onclick="loadEmployees()" class="btn-sm btn-primary">Filter</button>
+                <button onclick="clearFilters()" class="btn-sm btn-ghost">Clear</button>
+            </div>
+            <a href="/employees/add" class="btn-primary admin-only" style="display:none">
+                <i class="fa-solid fa-plus"></i> Add Employee
+            </a>
+        </div>
+
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th><th>Name</th><th>Email</th><th>Department</th>
+                        <th>Designation</th>
+                        <th class="admin-only" style="display:none">Salary (PKR)</th>
+                        <th>Manager</th><th>Status</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="employees-body">
+                    <tr><td colspan="9" class="loading-row">Loading…</td></tr>
+                </tbody>
+            </table>
+            <div class="table-footer" id="table-footer"></div>
+        </div>
+
+        <p class="edit-hint admin-only" style="display:none">
+            <i class="fa-solid fa-circle-info"></i>
+            Tip: Click on a salary value to edit it inline.
+        </p>
+    </div>
+</main>
+
+<script src="/static/base.js"></script>
+<script src="/static/sidebar.js"></script>
+<script>
+let pageUser   = null;
+let isAdmin    = false;
+
+(async () => {
+    pageUser = await initPage('employees');
+    if (!pageUser) return;
+    isAdmin = ['ADMIN','HR'].includes(pageUser.role);
+
+    if (isAdmin) {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+    }
+
+    await loadEmployees();
+})();
+
+async function loadEmployees() {
+    const search = document.getElementById('search-input').value.trim();
+    const dept   = document.getElementById('dept-select').value;
+    const status = document.getElementById('status-select').value;
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (dept)   params.set('dept',   dept);
+    if (status) params.set('status', status);
+
+    try {
+        const res  = await fetch('/api/employees?' + params);
+        const data = await res.json();
+        if (data.error) { showAlert(data.error); return; }
+
+        // Populate dept dropdown once
+        const deptSel = document.getElementById('dept-select');
+        if (deptSel.options.length <= 1 && data.departments) {
+            data.departments.forEach(d => deptSel.add(new Option(d.name, d.id)));
+            if (dept) deptSel.value = dept;
+        }
+
+        const tbody = document.getElementById('employees-body');
+        if (!data.employees || !data.employees.length) {
+            tbody.innerHTML = `<tr><td colspan="${isAdmin?9:8}" class="empty-row">No employees found.</td></tr>`;
+        } else {
+            tbody.innerHTML = data.employees.map(e => `
+                <tr id="row-${e.emp_id}">
+                    <td class="mono">${e.emp_id}</td>
+                    <td><strong>${e.name}</strong></td>
+                    <td class="mono" style="font-size:.8rem">${e.email}</td>
+                    <td><span class="badge badge-blue">${e.dept}</span></td>
+                    <td>${e.designation}</td>
+                    ${isAdmin ? `
+                    <td>
+                        <div class="salary-cell" id="salary-cell-${e.emp_id}">
+                            <span class="salary-display" title="Click to edit"
+                                  onclick="startSalaryEdit(${e.emp_id}, ${e.salary})">
+                                ${fmtNum(e.salary)}
+                            </span>
+                        </div>
+                    </td>` : ''}
+                    <td>${e.manager}</td>
+                    <td>${statusBadge(e.status)}</td>
+                    <td class="actions">
+                        <a href="/employees/view/${e.emp_id}" class="btn-xs btn-ghost">
+                            <i class="fa-solid fa-eye"></i> View
+                        </a>
+                        ${isAdmin ? `
+                        <a href="/employees/edit/${e.emp_id}" class="btn-xs btn-primary">
+                            <i class="fa-solid fa-pen"></i> Edit
+                        </a>
+                        ${e.status === 'ACTIVE'
+                            ? `<button onclick="toggleStatus(${e.emp_id},'INACTIVE')" class="btn-xs btn-danger">Deactivate</button>`
+                            : `<button onclick="toggleStatus(${e.emp_id},'ACTIVE')" class="btn-xs" style="background:rgba(106,190,167,.15);color:#0a6e56;border:1px solid rgba(106,190,167,.3)">Activate</button>`
+                        }` : ''}
+                    </td>
+                </tr>`).join('');
+        }
+
+        document.getElementById('table-footer').textContent =
+            `${data.employees.length} employee(s) found`;
+    } catch { showAlert('Failed to load employees.'); }
+}
+
+// ── Inline salary editing ───────────────────────────────────
+function startSalaryEdit(empId, currentSalary) {
+    const cell = document.getElementById(`salary-cell-${empId}`);
+    cell.innerHTML = `
+        <input type="number" class="salary-edit-input" id="sal-input-${empId}"
+               value="${currentSalary}" min="1" step="100">
+        <button class="save-salary-btn"   onclick="saveSalary(${empId})">✓</button>
+        <button class="cancel-salary-btn" onclick="loadEmployees()">✕</button>
+    `;
+    const input = document.getElementById(`sal-input-${empId}`);
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  saveSalary(empId);
+        if (e.key === 'Escape') loadEmployees();
+    });
+}
+
+async function saveSalary(empId) {
+    const input = document.getElementById(`sal-input-${empId}`);
+    const newSal = parseFloat(input.value);
+    if (!newSal || newSal <= 0) { showAlert('Please enter a valid salary.'); return; }
+
+    try {
+        const res  = await fetch(`/api/employees/${empId}/salary`, {
+            method:  'PATCH',
+            headers: {'Content-Type':'application/json'},
+            body:    JSON.stringify({salary: newSal})
+        });
+        const data = await res.json();
+        if (data.success) {
+            showAlert(`Salary updated to PKR ${fmtNum(newSal)}`, 'success');
+            await loadEmployees();
+        } else {
+            showAlert(data.message || 'Failed to update salary.');
+        }
+    } catch { showAlert('Network error.'); }
+}
+
+// ── Toggle active/inactive ──────────────────────────────────
+async function toggleStatus(empId, newStatus) {
+    const action = newStatus === 'INACTIVE' ? 'Deactivate' : 'Activate';
+    if (!confirm(`${action} this employee?`)) return;
+    try {
+        const res  = await fetch(`/api/employees/${empId}/status`, {
+            method:  'PATCH',
+            headers: {'Content-Type':'application/json'},
+            body:    JSON.stringify({status: newStatus})
+        });
+        const data = await res.json();
+        if (data.success) {
+            showAlert(`Employee ${newStatus === 'INACTIVE' ? 'deactivated' : 'activated'}.`, 'success');
+            await loadEmployees();
+        } else {
+            showAlert(data.message || 'Action failed.');
+        }
+    } catch { showAlert('Network error.'); }
+}
+
+function clearFilters() {
+    document.getElementById('search-input').value  = '';
+    document.getElementById('dept-select').value   = '';
+    document.getElementById('status-select').value = '';
+    loadEmployees();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('search-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') loadEmployees();
+    });
+});
+</script>
+</body>
+</html>

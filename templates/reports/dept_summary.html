@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Summary / HRMS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<main class="main-wrap">
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <div class="page-title">Department Summary Report</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topbar-date"></span>
+        </div>
+    </header>
+    <div class="content-area">
+        <div id="alert-area"></div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Department Headcount &amp; Salary</h3>
+                <span class="sql-badge">GROUP BY · LEFT JOIN · Subquery</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Department</th><th>Headcount</th><th>Avg Salary</th>
+                        <th>Max Salary</th><th>Min Salary</th><th>Total Salary</th>
+                        <th>Present (This Month)</th>
+                    </tr>
+                </thead>
+                <tbody id="dept-body">
+                    <tr><td colspan="7" class="loading-row">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card" style="margin-top:1.5rem">
+            <div class="card-header">
+                <h3>Above-Average Salary Employees</h3>
+                <span class="sql-badge">Nested Subquery · WHERE salary &gt; AVG</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Name</th><th>Department</th><th>Salary</th><th>Above Avg By</th></tr>
+                </thead>
+                <tbody id="above-avg-body">
+                    <tr><td colspan="4" class="loading-row">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top:1rem">
+            <a href="/reports" class="btn-ghost">← Back to Reports</a>
+        </div>
+    </div>
+</main>
+
+<script src="/static/base.js"></script>
+<script src="/static/sidebar.js"></script>
+<script>
+(async () => {
+    await initPage('reports');
+
+    try {
+        const res  = await fetch('/api/reports/department-summary');
+        const data = await res.json();
+        if (data.error) { showAlert(data.error); return; }
+
+        // Dept table
+        const deptBody = document.getElementById('dept-body');
+        if (!data.dept_data || !data.dept_data.length) {
+            deptBody.innerHTML = '<tr><td colspan="7" class="empty-row">No data.</td></tr>';
+        } else {
+            deptBody.innerHTML = data.dept_data.map(d => `
+                <tr>
+                    <td><strong>${d.dept}</strong></td>
+                    <td>${d.headcount || 0}</td>
+                    <td>${fmtNum(d.avg_salary)}</td>
+                    <td>${fmtNum(d.max_salary)}</td>
+                    <td>${fmtNum(d.min_salary)}</td>
+                    <td><strong>${fmtNum(d.total_salary)}</strong></td>
+                    <td>${d.present_month || 0}</td>
+                </tr>`).join('');
+        }
+
+        // Above avg table
+        const aboveBody = document.getElementById('above-avg-body');
+        if (!data.above_avg || !data.above_avg.length) {
+            aboveBody.innerHTML = '<tr><td colspan="4" class="empty-row">No data.</td></tr>';
+        } else {
+            aboveBody.innerHTML = data.above_avg.map(r => `
+                <tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td>${r.dept}</td>
+                    <td>${fmtNum(r.salary)}</td>
+                    <td class="text-green">+${fmtNum(r.diff)}</td>
+                </tr>`).join('');
+        }
+
+    } catch { showAlert('Failed to load department summary.'); }
+})();
+</script>
+</body>
+</html>
