@@ -5,7 +5,7 @@ import hashlib
 auth_bp = Blueprint("auth", __name__)
 
 # ── Invite key (admin shares this with new employees) ──────────────────────
-INVITE_KEY = "HRMS2024"   # Change this to whatever you like
+INVITE_KEY = "HRMS2024" 
 
 
 def hash_password(password):
