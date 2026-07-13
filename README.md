@@ -70,7 +70,6 @@ Project/
 └── README.md
 ```
 
-> Adjust this tree to match your actual folder layout.
 
 ## Connecting Oracle XE to the Project in VS Code
 
